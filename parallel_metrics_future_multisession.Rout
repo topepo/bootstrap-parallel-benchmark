@@ -1,0 +1,175 @@
+
+R version 4.5.0 (2025-04-11) -- "How About a Twenty-Six"
+Copyright (C) 2025 The R Foundation for Statistical Computing
+Platform: aarch64-apple-darwin20
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> library(dplyr)
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+> library(rsample)
+> library(yardstick)
+> library(parallel)
+> library(sessioninfo)
+> library(syrup)
+Loading required package: bench
+> # more library() calls below
+> 
+> rand_int <- sample.int(1000, 1)
+> 
+> # ------------------------------------------------------------------------------
+> 
+> compute_metrics <- function(split) {
++   require(rsample)
++   require(yardstick)
++   dat <- analysis(split)
++   mtr <- metric_set(rmse, rsq, mae, ccc)
++   mtr(dat, y, .pred)
++ }
+> 
+> pkgs <- c("yardstick", "rsample")
+> 
+> # ------------------------------------------------------------------------------
+> 
+> data_size <- 10000
+> boot_size <- 5000
+> 
+> set.seed(1)
+> dat <- tibble(y = rnorm(data_size)) |>
++   mutate(.pred = y + rnorm(data_size, sd = 0.1))
+> 
+> set.seed(2)
+> rs <- bootstraps(dat, times = boot_size)
+> 
+> # example iteration
+> compute_metrics(rs$splits[[1]])
+# A tibble: 4 × 3
+  .metric .estimator .estimate
+  <chr>   <chr>          <dbl>
+1 rmse    standard      0.0984
+2 rsq     standard      0.990 
+3 mae     standard      0.0782
+4 ccc     standard      0.995 
+> 
+> # ------------------------------------------------------------------------------
+> 
+> seq_time <-
++   system.time({
++     set.seed(3)
++     metrics <- lapply(rs$splits, compute_metrics)
++   })
+> 
+> seq_time
+   user  system elapsed 
+ 18.900   1.475  20.376 
+> 
+> seq_time <- tibble::as_tibble_row(seq_time) |>
++   mutate(
++     parallel = FALSE,
++     run = rand_int,
++     num_workers = parallelly::availableCores(),
++     framework = "future",
++     backend = "multisession",
++     platform = .Platform$pkgType
++   )
+> 
+> # ------------------------------------------------------------------------------
+> 
+> library(parallelly)
+> library(future.apply)
+Loading required package: future
+> 
+> plan(multisession)
+> 
+> suffix <- paste0("-future-multisession-", rand_int, ".RData")
+> 
+> # ------------------------------------------------------------------------------
+> 
+> par_time <-
++   system.time({
++     set.seed(3)
++     metrics <- future_lapply(
++       rs$splits,
++       compute_metrics,
++       future.packages = pkgs,
++       future.globals = c("compute_metrics")
++     )
++   })
+> 
+> par_time
+   user  system elapsed 
+  2.117   1.837  11.971 
+> 
+> par_time <- tibble::as_tibble_row(par_time) |>
++   mutate(
++     parallel = TRUE,
++     run = rand_int,
++     num_workers = parallelly::availableCores(),
++     framework = "future",
++     backend = "multisession",
++     platform = .Platform$pkgType
++   )
+> 
+> res <- bind_rows(seq_time, par_time)
+> 
+> # ------------------------------------------------------------------------------
+> 
+> main_pid <- Sys.getpid()
+> 
+> monitor <- syrup({
++   set.seed(3)
++   metrics <- future_lapply(
++     rs$splits,
++     compute_metrics,
++     future.packages = pkgs,
++     future.globals = c("compute_metrics")
++   )
++ }, interval = 1 / 20)
+> 
+> monitor <- monitor |>
++   mutate(
++     parallel = TRUE,
++     run = rand_int,
++     num_workers = parallelly::availableCores(),
++     framework = "future",
++     backend = "multisession",
++     platform = .Platform$pkgType,
++     rel_time = as.numeric(time),
++     rel_time = (rel_time - min(rel_time)) / (max(rel_time) - min(rel_time))
++   )
+> 
+> # ------------------------------------------------------------------------------
+> 
+> save(res, file = file.path("results", paste0("res", suffix)))
+> save(monitor, main_pid, file = file.path("results", paste0("monitor", suffix)))
+> 
+> # ------------------------------------------------------------------------------
+> 
+> if (!interactive()) {
++   q("no")
++ }
+> proc.time()
+   user  system elapsed 
+ 29.910   7.953  49.605 

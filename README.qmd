@@ -1,0 +1,331 @@
+---
+title: "Parallel Processing Bootstrap Samples"
+author: "Max Kuhn"
+format: html
+execute:
+  keep-md: true
+---
+
+The tidymodels group is completing its transition from using the foreach package for parallel processing, moving to the future framework. 
+ 
+I was working on doing this for our infrastructure in the tune package to conduct bootstrap confidence intervals for model performance statistics (e.g., area under the ROC curve, R<sup>2</sup>, etc). 
+ 
+When running test cases, I noticed that parallel processing was taking longer than sequential execution. This is expected for tasks that are already very fast. However, in this application, I was splitting 30,000 tasks across 10 workers, so I was expecting, at worst, to break even in terms of execution time. 
+ 
+While looking at the macOS Activity Monitor, no more than 2-3 workers were doing anything at any specific time, and the utilization seemed to be hopping around between worker processes a lot. To quantify/check this, I used Simon’s syrup port and found that there was a saw-toothed pattern to the percent CPU data: 
+ 
+
+## Reprex
+
+We need a _small_ reproducible example to test with, so I simplified the task so that we didn’t need all of the tidymodels infrastructure. For these tests, I simulate 10,000 data points of observed and predicted values, then compute four performance statistics using the yardstick package. 
+ 
+The original problems differ slightly from this since we compute metrics for different model candidates within each data set; basically, the original code has a short `for` loop inside of it.
+
+ There are five R scripts that run the benchmarks under different scenarios. The foreach cases are used as a control. Each run of the scripts produces a baseline sequential result that uses `lapply()`. Each as run five times in a stratified random order
+ 
+### `parallel_metrics_foreach_only.R`
+ 
+ Runs foreach using a psock cluster. Pseudocode:
+ 
+```r
+foreach(i = boot_size, .packages = pkgs) %dopar%
+  compute_metrics(rsamples)
+``` 
+ 
+### `parallel_metrics_foreach_mirai.R`
+
+  Runs foreach using a mirai cluster (via `mirai:: make_cluster()`). Pseudocode is the same
+ 
+```r
+foreach(i = boot_size, .packages = pkgs) %dopar%
+  compute_metrics(rsamples)
+``` 
+ 
+### `parallel_metrics_foreach_doFuture.R`
+ 
+ Use the doFuture package to setup the multisession (=psock) workers and still be the standard foreach operator 
+ 
+ ```r
+registerDoFuture()
+plan(multisession)
+
+foreach(i = boot_size, .packages = pkgs) %dopar%
+  compute_metrics(rsamples)
+``` 
+
+### `parallel_metrics_future_multisession.R`
+
+Basic future code (via future.apply) using a multisession plan: 
+
+ ```r
+plan(multisession)
+
+future_lapply(
+    resamples,
+    compute_metrics,
+    future.packages = c("rsample", "yardstick"),
+    future.globals = c("compute_metrics")
+  )
+``` 
+
+### `parallel_metrics_future_mirai.R`
+
+Same but using mirai directly via future.mirai:
+
+ ```r
+plan(mirai_multisession)
+
+future_lapply(
+    resamples,
+    compute_metrics,
+    future.packages = c("rsample", "yardstick"),
+    future.globals = c("compute_metrics")
+  )
+``` 
+
+## Running the Tests
+
+There are a few packages to install: 
+
+```{r}
+#| label: pkgs
+pkgs <- c("doFuture", "doParallel", "dplyr", "foreach", "future.mirai", 
+          "future.apply", "ggplot2", "mirai", "parallelly", "purrr", "rsample", 
+          "sessioninfo", "simonpcouch/syrup", "yardstick")
+```
+
+We recommend using the pak package to install them: 
+
+```r
+pak::pak(pkgs, ask = FALSE)
+```
+
+To produce the results, run `go.sh` in a terminal from the root of this repository and more results are generated. You will not get the same numbers as those shown here. Using an Apple M3 Pro MacBook Pro, the script takes about 25 minutes to run. 
+
+## Results
+
+```{r}
+#| label: ingest-results
+#| include: false
+
+library(dplyr)
+library(ggplot2)
+library(purrr)
+
+theme_set(theme_bw())
+options(pillar.advice = FALSE, pillar.min_title_chars = Inf)
+
+# ------------------------------------------------------------------------------
+
+res_rd <- list.files("results", pattern = "res-", full.names = TRUE)
+mon_rd <- list.files("results", pattern = "monitor-", full.names = TRUE)
+
+# ------------------------------------------------------------------------------
+
+get_res <- function(x) {
+  load(x)
+  res |>
+    mutate(
+      backend = ifelse(backend == "foreach", "multisession", backend)
+    )
+}
+
+get_monitor <- function(x) {
+  load(x)
+  monitor |>
+    filter(!is.na(pct_cpu)) |>
+    mutate(main_pid = main_pid)
+}
+
+# ------------------------------------------------------------------------------
+
+all_res <- map_dfr(res_rd, get_res)
+all_monitor <- map_dfr(mon_rd, get_monitor)
+```
+
+Unlike the original task, the results show that parallel processing is speeding things up to various degrees. The fastest was using foreach with doFuture (more on this below). On average, mirai was faster than multisession, most likely because its allocation of tasks to workers is dynamic. 
+
+
+```{r}
+#| label: timings
+#| echo: false
+#| out-width: 70%
+#| fig-width: 5
+#| fig-height: 4
+#| fig-align: center
+#| warning: false
+
+theme_set(theme_bw() + theme(legend.position = "top"))
+
+all_res |>
+  ggplot(aes(parallel, elapsed, group = framework, col = framework)) +
+  geom_point(cex = 1) +
+  geom_smooth(aes(col = framework), method = lm, se = FALSE) +
+  facet_wrap(~backend) +
+  scale_color_brewer(palette = "Dark2")
+```
+
+When viewed as speed-ups:
+
+```{r}
+#| label: speedups
+#| echo: false
+#| out-width: 70%
+#| fig-width: 5
+#| fig-height: 4
+#| fig-align: center
+#| warning: false
+
+baseline <-
+  all_res |>
+  filter(!parallel) |>
+  select(baseline = elapsed, run, framework, backend)
+
+speed_ups <-
+  all_res |>
+  filter(parallel) |>
+  inner_join(baseline, by = join_by(run, framework, backend)) |>
+  mutate(speed_up = as.numeric(baseline / elapsed))
+
+best_speed <-
+  speed_ups |>
+  summarize(mean = mean(speed_up), .by = c(backend, framework)) |> 
+  slice_max(mean, n = 1) |> 
+  pluck("mean") |> 
+  round(1)
+
+speed_ups |>
+  ggplot(aes(backend, speed_up, col = framework)) +
+  geom_jitter(width = 0.05, alpha = 3 / 4) + 
+  geom_hline(yintercept = 1, col = "red", lty = 2) + 
+  geom_hline(yintercept = all_monitor$num_workers[1], col = "green", lty = 2) +
+  scale_color_brewer(palette = "Dark2")
+```
+
+The best speed-ups were around `r best_speed`-fold. This is good but should probably be higher since `r all_monitor$num_workers[1]` cores were used in parallel. The other combinations ranged between 1.5-fold to about 3-fold. 
+
+## CPU Itilization
+
+CPU usage was recorded for the workers every 0.05 seconds. We can see how each case behaved. In the plots below, each facet is a worker process (the value in the banner is the process ID).
+
+First, the winner: foreach with doFuture has the best speed-ups but from the CPU data, this is inexpiable since only one worker appears to be doing anything (this is consistent across the five runs): 
+
+```{r}
+#| label: foreach-future
+#| echo: false
+#| out-width: 100%
+#| fig-width: 6
+#| fig-height: 4
+#| fig-align: center
+#| warning: false
+
+all_monitor |>
+  filter(
+    framework == "foreach/doFuture/%dopar%" &
+      parallel &
+      pid != main_pid &
+      run == 482
+  ) |>
+  mutate(pid = factor(pid)) |>
+  ggplot(aes(time, pct_cpu)) +
+  geom_point(aes(col = pid, group = pid), show.legend = FALSE, cex = 1 / 2) +
+  geom_line(aes(col = pid, group = pid), show.legend = FALSE) +
+  facet_wrap(~pid) +
+  labs(title = "foreach + doFuture + multisession + %dopar%", y = "CPU (%)")
+```
+
+
+¯\\_(ツ)_/¯
+
+mirai (with foreach) was trying harder to maintain utilization, but it significantly fluctuates with periods of inactivity.  
+
+```{r}
+#| label: foreach-mirai
+#| echo: false
+#| out-width: 100%
+#| fig-width: 6
+#| fig-height: 4
+#| fig-align: center
+#| warning: false
+
+all_monitor |>
+  filter(
+    backend == "mirai" & framework == "foreach" & parallel & pid != main_pid
+  ) |>
+  slice_min(run, n = 1) |>
+  mutate(pid = factor(pid)) |>
+  ggplot(aes(time, pct_cpu)) +
+  geom_point(aes(col = pid, group = pid), show.legend = FALSE, cex = 1 / 2) +
+  geom_line(aes(col = pid, group = pid), show.legend = FALSE) +
+  facet_wrap(~pid) +
+  labs(title = "foreach + mirai", y = "CPU (%)")
+```
+
+Switching to using mirai with future showd utilization ramping up but, overall, has speed-ups less than 3-fold using `r all_monitor$num_workers[1]` workers. 
+
+```{r}
+#| label: future-mirai
+#| echo: false
+#| out-width: 100%
+#| fig-width: 6
+#| fig-height: 4
+#| fig-align: center
+#| warning: false
+
+all_monitor |>
+  filter(
+    backend == "mirai" & framework == "future" & parallel & pid != main_pid
+  ) |>
+  slice_min(run, n = 1) |>
+  mutate(pid = factor(pid)) |>
+  ggplot(aes(time, pct_cpu)) +
+  geom_point(aes(col = pid, group = pid), show.legend = FALSE, cex = 1 / 2) +
+  geom_line(aes(col = pid, group = pid), show.legend = FALSE) +
+  facet_wrap(~pid) +
+  labs(title = "future + mirai", y = "CPU (%)")
+```
+
+Finally, future and multisession showed a pattern that approximated our original results. 
+
+```{r}
+#| label: future-multisession
+#| echo: false
+#| out-width: 100%
+#| fig-width: 6
+#| fig-height: 4
+#| fig-align: center
+#| warning: false
+
+all_monitor |>
+  filter(
+    backend == "multisession" & framework == "future" & parallel & pid != main_pid
+  ) |>
+  slice_min(run, n = 1) |>
+  mutate(pid = factor(pid)) |>
+  ggplot(aes(time, pct_cpu)) +
+  geom_point(aes(col = pid, group = pid), show.legend = FALSE, cex = 1 / 2) +
+  geom_line(aes(col = pid, group = pid), show.legend = FALSE) +
+  facet_wrap(~pid) +
+  labs(title = "future + multisession", y = "CPU (%)")
+```
+
+
+## Session Info
+
+```{r}
+#| label: load-pkgs
+#| include: false
+
+pkg_nms <- gsub("simonpcouch/", "", pkgs)
+
+lapply(pkg_nms, function(x) library(x, character.only = TRUE))
+```
+
+The versions that I had when running these: 
+
+```{r}
+#| label: session
+#| echo: false
+
+sessioninfo::session_info(pkgs = pkg_nms)
+```

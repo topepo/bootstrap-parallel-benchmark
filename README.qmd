@@ -218,6 +218,7 @@ First, the winner: foreach with doFuture has the best speed-ups but from the CPU
 #| fig-height: 4
 #| fig-align: center
 #| warning: false
+#| dev: svg
 
 all_monitor |>
   filter(

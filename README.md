@@ -130,7 +130,7 @@ CPU usage was recorded for the workers every 0.05 seconds. We can see how each c
 First, the winner: foreach with doFuture has the best speed-ups but from the CPU data, this is inexpiable since only one worker appears to be doing anything (this is consistent across the five runs): 
 
 <div class="figure" style="text-align: center">
-<img src="figure/foreach-future-1.png" alt="plot of chunk foreach-future" width="100%" />
+<img src="figure/foreach-future-1.svg" alt="plot of chunk foreach-future" width="100%" />
 <p class="caption">plot of chunk foreach-future</p>
 </div>
 

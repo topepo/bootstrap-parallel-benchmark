@@ -1,10 +1,4 @@
----
-title: "Parallel Processing Bootstrap Samples"
-author: "Max Kuhn"
-format: html
-execute:
-  keep-md: true
----
+# Parallel Processing Bootstrap Samples
 
 The tidymodels group is completing its transition from using the foreach package for parallel processing, moving to the future framework. 
  

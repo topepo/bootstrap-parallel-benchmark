@@ -154,6 +154,7 @@ Unlike the original task, the results show that parallel processing is speeding 
 #| fig-height: 4
 #| fig-align: center
 #| warning: false
+#| dev: svg
 
 theme_set(theme_bw() + theme(legend.position = "top"))
 
@@ -175,6 +176,7 @@ When viewed as speed-ups:
 #| fig-height: 4
 #| fig-align: center
 #| warning: false
+#| dev: svg
 
 baseline <-
   all_res |>
@@ -248,6 +250,7 @@ mirai (with foreach) was trying harder to maintain utilization, but it significa
 #| fig-height: 4
 #| fig-align: center
 #| warning: false
+#| dev: svg
 
 all_monitor |>
   filter(
@@ -272,6 +275,7 @@ Switching to using mirai with future showd utilization ramping up but, overall, 
 #| fig-height: 4
 #| fig-align: center
 #| warning: false
+#| dev: svg
 
 all_monitor |>
   filter(
@@ -296,6 +300,7 @@ Finally, future and multisession showed a pattern that approximated our original
 #| fig-height: 4
 #| fig-align: center
 #| warning: false
+#| dev: svg
 
 all_monitor |>
   filter(

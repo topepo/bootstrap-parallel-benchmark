@@ -110,14 +110,14 @@ Unlike the original task, the results show that parallel processing is speeding 
 
 
 <div class="figure" style="text-align: center">
-<img src="figure/timings-1.png" alt="plot of chunk timings" width="70%" />
+<img src="figure/timings-1.svg" alt="plot of chunk timings" width="70%" />
 <p class="caption">plot of chunk timings</p>
 </div>
 
 When viewed as speed-ups:
 
 <div class="figure" style="text-align: center">
-<img src="figure/speedups-1.png" alt="plot of chunk speedups" width="70%" />
+<img src="figure/speedups-1.svg" alt="plot of chunk speedups" width="70%" />
 <p class="caption">plot of chunk speedups</p>
 </div>
 
@@ -140,21 +140,21 @@ First, the winner: foreach with doFuture has the best speed-ups but from the CPU
 mirai (with foreach) was trying harder to maintain utilization, but it significantly fluctuates with periods of inactivity.  
 
 <div class="figure" style="text-align: center">
-<img src="figure/foreach-mirai-1.png" alt="plot of chunk foreach-mirai" width="100%" />
+<img src="figure/foreach-mirai-1.svg" alt="plot of chunk foreach-mirai" width="100%" />
 <p class="caption">plot of chunk foreach-mirai</p>
 </div>
 
 Switching to using mirai with future showd utilization ramping up but, overall, has speed-ups less than 3-fold using 12 workers. 
 
 <div class="figure" style="text-align: center">
-<img src="figure/future-mirai-1.png" alt="plot of chunk future-mirai" width="100%" />
+<img src="figure/future-mirai-1.svg" alt="plot of chunk future-mirai" width="100%" />
 <p class="caption">plot of chunk future-mirai</p>
 </div>
 
 Finally, future and multisession showed a pattern that approximated our original results. 
 
 <div class="figure" style="text-align: center">
-<img src="figure/future-multisession-1.png" alt="plot of chunk future-multisession" width="100%" />
+<img src="figure/future-multisession-1.svg" alt="plot of chunk future-multisession" width="100%" />
 <p class="caption">plot of chunk future-multisession</p>
 </div>
 

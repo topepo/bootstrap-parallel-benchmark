@@ -225,7 +225,7 @@ CPU usage was recorded for the workers every 0.05 seconds. We can see how each c
 
 First, the winner: foreach with doFuture has the best speed-ups but from the CPU data, this is inexpiable since only one worker appears to be doing anything (this is consistent across the five runs): 
 
-```{r}
+```{r,eval=FALSE}
 #| label: foreach-future
 #| echo: false
 #| out-width: 100%

@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 
 R CMD BATCH --vanilla parallel_metrics_future_multisession.R
 sleep 10

@@ -55,7 +55,7 @@ speed_ups |>
   ggplot(aes(backend, speed_up, col = framework)) +
   geom_jitter(width = 0.05) + 
   facet_wrap(~ platform) +
-  geom_
+  geom_hline(yintercept = 0, lty = 2, col = "red")
 
 # ------------------------------------------------------------------------------
 

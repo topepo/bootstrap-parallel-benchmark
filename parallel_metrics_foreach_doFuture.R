@@ -63,9 +63,9 @@ library(parallelly)
 library(foreach)
 library(doFuture)
 
-cores <- parallelly::availableCores()
+cores <- min(parallelly::availableCores(), 12)
 registerDoFuture()
-plan(multisession)
+plan(multisession, workers = cores)
 
 suffix <- paste0("-foreach-doFuture-", rand_int, ".RData")
 

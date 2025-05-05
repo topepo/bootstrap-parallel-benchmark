@@ -38,22 +38,24 @@ all_res |>
   ggplot(aes(parallel, elapsed, group = framework, col = framework)) +
   geom_point(cex = 1) +
   geom_smooth(aes(col = framework), method = lm, se = FALSE) +
-  facet_wrap(~backend)
+  facet_grid(platform~backend)
 
 baseline <-
   all_res |>
   filter(!parallel) |>
-  select(baseline = elapsed, run, framework, backend)
+  select(baseline = elapsed, run, framework, backend, platform)
 
 speed_ups <-
   all_res |>
   filter(parallel) |>
-  inner_join(baseline, by = join_by(run, framework, backend)) |>
+  inner_join(baseline, by = join_by(run, framework, backend, platform)) |>
   mutate(speed_up = as.numeric(baseline / elapsed))
 
 speed_ups |>
   ggplot(aes(backend, speed_up, col = framework)) +
-  geom_jitter(width = 0.05)
+  geom_jitter(width = 0.05) + 
+  facet_wrap(~ platform) +
+  geom_
 
 # ------------------------------------------------------------------------------
 
@@ -72,8 +74,9 @@ all_monitor |>
     framework == "foreach/doFuture/%dopar%" &
       parallel &
       pid != main_pid &
-      run == 921
+      platform == "win.binary"
   ) |>
+  slice_min(run, n = 1) |>
   mutate(pid = factor(pid)) |>
   ggplot(aes(time, pct_cpu)) +
   geom_point(aes(col = pid, group = pid), show.legend = FALSE, cex = 1 / 2) +

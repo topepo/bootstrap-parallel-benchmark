@@ -61,7 +61,7 @@ library(parallelly)
 library(foreach)
 library(doParallel)
 
-cores <- parallelly::availableCores()
+cores <- min(parallelly::availableCores(), 12)
 cl <- makePSOCKcluster(cores)
 registerDoParallel(cl)
 

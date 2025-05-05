@@ -60,7 +60,8 @@ seq_time <- tibble::as_tibble_row(seq_time) |>
 library(parallelly)
 library(future.apply)
 
-plan(multisession)
+cores <- min(parallelly::availableCores(), 12)
+plan(multisession, workers = cores)
 
 suffix <- paste0("-future-multisession-", rand_int, ".RData")
 

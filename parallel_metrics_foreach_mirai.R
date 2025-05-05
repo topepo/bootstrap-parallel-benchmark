@@ -62,7 +62,7 @@ library(foreach)
 library(doParallel)
 library(mirai)
 
-cores <- parallelly::availableCores()
+cores <- min(parallelly::availableCores(), 12)
 cl <- make_cluster(cores)
 doParallel::registerDoParallel(cl)
 

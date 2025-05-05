@@ -61,7 +61,8 @@ library(parallelly)
 library(future.apply)
 library(future.mirai)
 
-plan(mirai_multisession)
+cores <- min(parallelly::availableCores(), 12)
+plan(mirai_multisession, workers = cores)
 
 suffix <- paste0("-future-mirai-", rand_int, ".RData")
 

@@ -13,6 +13,18 @@ I was working on doing this for our infrastructure in the tune package to conduc
 When running test cases, I noticed that parallel processing was taking longer than sequential execution. This is expected for tasks that are already very fast. However, in this application, I was splitting 30,000 tasks across 10 workers, so I was expecting, at worst, to break even in terms of execution time. 
  
 While looking at the macOS Activity Monitor, no more than 2-3 workers were doing anything at any specific time, and the utilization seemed to be hopping around between worker processes a lot. To quantify/check this, I used Simon’s syrup port and found that there was a saw-toothed pattern to the percent CPU data: 
+
+
+```{r}
+#| label: original
+#| echo: false
+#| out-width: 90%
+#| fig-width: 7
+#| fig-height: 4
+#| fig-align: center
+
+knitr::include_graphics("figure/original.svg")
+```
  
 
 ## Reprex

@@ -7,7 +7,12 @@ I was working on doing this for our infrastructure in the tune package to conduc
 When running test cases, I noticed that parallel processing was taking longer than sequential execution. This is expected for tasks that are already very fast. However, in this application, I was splitting 30,000 tasks across 10 workers, so I was expecting, at worst, to break even in terms of execution time. 
  
 While looking at the macOS Activity Monitor, no more than 2-3 workers were doing anything at any specific time, and the utilization seemed to be hopping around between worker processes a lot. To quantify/check this, I used Simon’s syrup port and found that there was a saw-toothed pattern to the percent CPU data: 
+
+<div class="figure" style="text-align: center">
+<img src="figure/original.svg" alt="plot of chunk original" width="90%" />
+</div>
  
+Each panel represents how much CPU was being used by one of the worker subprocesses. With this many tasks, we would normally see the line go near 100% and then fall back to zero (with no inactivity in between). These data were generated using the future package with a multisession backend. 
 
 ## Reprex
 
@@ -165,7 +170,7 @@ The versions that I had when running these:
 ##  collate  en_US.UTF-8
 ##  ctype    en_US.UTF-8
 ##  tz       America/New_York
-##  date     2025-05-04
+##  date     2025-05-05
 ##  pandoc   3.1.11 @ /opt/homebrew/bin/pandoc
 ##  quarto   1.7.27 @ /usr/local/bin/quarto
 ## 

@@ -26,6 +26,7 @@ While looking at the macOS Activity Monitor, no more than 2-3 workers were doing
 knitr::include_graphics("figure/original.svg")
 ```
  
+Each panel represents how much CPU was being used by one of the worker subprocesses. With this many tasks, we would normally see the line go near 100% and then fall back to zero (with no inactivity in between). These data were generated using the future package with a multisession backend. 
 
 ## Reprex
 

@@ -29,8 +29,29 @@ get_monitor <- function(x) {
 
 # ------------------------------------------------------------------------------
 
-all_res <- map_dfr(res_rd, get_res)
-all_monitor <- map_dfr(mon_rd, get_monitor)
+all_res <- map_dfr(res_rd, get_res) |>
+  mutate(
+    platform = if_else(platform == "source", "unix", platform),
+    platform = if_else(
+      platform == "mac.binary.big-sur-arm64",
+      "macOS",
+      platform
+    )
+  )
+all_res |> count(platform, framework, backend)
+
+num_workers <- all_res |> distinct(platform, framework, backend, num_workers)
+
+all_monitor <- map_dfr(mon_rd, get_monitor) |>
+  mutate(
+    platform = if_else(platform == "source", "unix", platform),
+    platform = if_else(
+      platform == "mac.binary.big-sur-arm64",
+      "macOS",
+      platform
+    )
+  )
+all_monitor |> count(platform, framework, backend)
 
 # ------------------------------------------------------------------------------
 
@@ -38,7 +59,8 @@ all_res |>
   ggplot(aes(parallel, elapsed, group = framework, col = framework)) +
   geom_point(cex = 1) +
   geom_smooth(aes(col = framework), method = lm, se = FALSE) +
-  facet_grid(platform~backend)
+  facet_grid(backend ~ platform) +
+  labs(y = "Execution Time")
 
 baseline <-
   all_res |>
@@ -53,9 +75,17 @@ speed_ups <-
 
 speed_ups |>
   ggplot(aes(backend, speed_up, col = framework)) +
-  geom_jitter(width = 0.05) + 
-  facet_wrap(~ platform) +
-  geom_hline(yintercept = 0, lty = 2, col = "red")
+  geom_jitter(width = 0.05, alpha = 1 / 2) +
+  facet_wrap(~platform) +
+  geom_hline(yintercept = 1, lty = 2, col = "red") +
+  geom_hline(
+    data = num_workers,
+    aes(yintercept = num_workers),
+    lty = 2,
+    col = "green"
+  ) +
+  scale_y_continuous(trans = "log2") +
+  labs(y = "Speed-Up")
 
 # ------------------------------------------------------------------------------
 
@@ -69,58 +99,65 @@ total_cpu <-
   filter(max_cpu > 250 | max_cpu < 1) |>
   select(-max_cpu, -min_cpu)
 
-all_monitor |>
-  filter(
-    framework == "foreach/doFuture/%dopar%" &
-      parallel &
-      pid != main_pid &
-      platform == "win.binary"
-  ) |>
-  slice_min(run, n = 1) |>
-  mutate(pid = factor(pid)) |>
-  ggplot(aes(time, pct_cpu)) +
-  geom_point(aes(col = pid, group = pid), show.legend = FALSE, cex = 1 / 2) +
-  geom_line(aes(col = pid, group = pid), show.legend = FALSE) +
-  facet_wrap(~pid) +
-  labs(title = "foreach + doFuture + multisession + %dopar%")
+monitor_plot <- function(x, .platform, .backend, .framework) {
+  plot_data <- x |>
+    filter(
+      framework == .framework &
+        backend == .backend &
+        parallel &
+        pid != main_pid &
+        platform %in% .platform
+    ) |>
+    slice_min(run, n = 1) |>
+    mutate(
+      pid = factor(pid),
+      worker = format(as.integer(pid)),
+      worker = paste("worker process", worker)
+      )
+  
+  total_time <- 
+    difftime(
+      max(plot_data$time),
+      min(plot_data$time),
+      units = "secs"
+    ) |> 
+    ceiling()
+  
+  x_lab <- paste0("Time (min:sec)\ntotal time: ", as.numeric(total_time), "s")
+  titl <- paste0(.framework, " via ", .backend, " (", .platform, ")")
+  
+  plot_data |>
+    ggplot(aes(time, pct_cpu)) +
+    geom_point(
+      aes(col = worker, group = worker),
+      show.legend = FALSE,
+      cex = 1 / 2
+    ) +
+    geom_line(aes(col = worker, group = worker), show.legend = FALSE) +
+    facet_wrap(~worker) +
+    scale_x_datetime(date_labels = "%M:%S") +
+    labs(
+      title = titl,
+      x = x_lab,
+      y = "CPU usage (%)"
+    )
+}
 
-
-all_monitor |>
-  filter(
-    backend == "mirai" & framework == "foreach" & parallel & pid != main_pid
-  ) |>
-  slice_min(run, n = 1) |>
-  mutate(pid = factor(pid)) |>
-  ggplot(aes(time, pct_cpu)) +
-  geom_point(aes(col = pid, group = pid), show.legend = FALSE, cex = 1 / 2) +
-  geom_line(aes(col = pid, group = pid), show.legend = FALSE) +
-  facet_wrap(~pid) +
-  labs(title = "foreach + mirai")
-
-all_monitor |>
-  filter(
-    backend == "mirai" & framework == "future" & parallel & pid != main_pid
-  ) |>
-  slice_min(run, n = 1) |>
-  mutate(pid = factor(pid)) |>
-  ggplot(aes(time, pct_cpu)) +
-  geom_point(aes(col = pid, group = pid), show.legend = FALSE, cex = 1 / 2) +
-  geom_line(aes(col = pid, group = pid), show.legend = FALSE) +
-  labs(title = "future + mirai") +
-  facet_wrap(~pid)
-
-
-all_monitor |>
-  filter(
-    backend == "multisession" &
-      framework == "future" &
-      parallel &
-      pid != main_pid
-  ) |>
-  slice_min(run, n = 1) |>
-  mutate(pid = factor(pid)) |>
-  ggplot(aes(time, pct_cpu)) +
-  geom_point(aes(col = pid, group = pid), show.legend = FALSE, cex = 1 / 2) +
-  geom_line(aes(col = pid, group = pid), show.legend = FALSE) +
-  labs(title = "future + multisession") +
-  facet_wrap(~pid)
+monitor_plot(
+  all_monitor,
+  .framework = "future",
+  .backend = "mirai",
+  .platform = "unix"
+)
+monitor_plot(
+  all_monitor,
+  .framework = "future",
+  .backend = "mirai",
+  .platform = "macOS"
+)
+monitor_plot(
+  all_monitor,
+  .framework = "future",
+  .backend = "multisession",
+  .platform = "unix"
+)

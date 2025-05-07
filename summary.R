@@ -60,7 +60,8 @@ all_res |>
   geom_point(cex = 1) +
   geom_smooth(aes(col = framework), method = lm, se = FALSE) +
   facet_grid(backend ~ platform) +
-  labs(y = "Execution Time")
+  labs(y = "Execution Time") + 
+  theme(legend.position = "top")
 
 baseline <-
   all_res |>
@@ -85,7 +86,8 @@ speed_ups |>
     col = "green"
   ) +
   scale_y_continuous(trans = "log2") +
-  labs(y = "Speed-Up")
+  labs(y = "Speed-Up") + 
+  theme(legend.position = "top")
 
 # ------------------------------------------------------------------------------
 

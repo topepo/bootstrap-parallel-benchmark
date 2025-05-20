@@ -1,11 +1,13 @@
 
-R version 4.5.0 (2025-04-11) -- "How About a Twenty-Six"
-Copyright (C) 2025 The R Foundation for Statistical Computing
+R version 4.4.0 (2024-04-24) -- "Puppy Cup"
+Copyright (C) 2024 The R Foundation for Statistical Computing
 Platform: x86_64-pc-linux-gnu
 
 R is free software and comes with ABSOLUTELY NO WARRANTY.
 You are welcome to redistribute it under certain conditions.
 Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
 
 R is a collaborative project with many contributors.
 Type 'contributors()' for more information and
@@ -81,7 +83,7 @@ Loading required package: bench
 > 
 > seq_time
    user  system elapsed 
-157.453   0.170  39.498 
+ 20.493   0.068  20.566 
 > 
 > seq_time <- tibble::as_tibble_row(seq_time) |>
 +   mutate(
@@ -92,15 +94,6 @@ Loading required package: bench
 +     backend = "mirai",
 +     platform = .Platform$pkgType
 +   )
-scontrol: error: resolve_ctls_from_dns_srv: res_nsearch error: Unknown host
-scontrol: error: fetch_config: DNS SRV lookup failed
-scontrol: error: _establish_config_source: failed to fetch config
-scontrol: fatal: Could not establish a configuration source
-Warning message:
-There was 1 warning in `mutate()`.
-ℹ In argument: `num_workers = parallelly::availableCores()`.
-Caused by warning in `system2()`:
-! running command ''/usr/bin/scontrol' show hostname 'a1,b[02-04,6-7]'' had status 1 
 > 
 > # ------------------------------------------------------------------------------
 > 
@@ -128,7 +121,7 @@ Loading required package: iterators
 > 
 > par_time
    user  system elapsed 
-  2.081   7.629   9.277 
+  1.591   7.521   8.323 
 > 
 > par_time <- tibble::as_tibble_row(par_time) |>
 +   mutate(
@@ -179,4 +172,4 @@ Loading required package: iterators
 + }
 > proc.time()
    user  system elapsed 
-171.397  30.641  72.909 
+ 30.365  16.429  41.421 
